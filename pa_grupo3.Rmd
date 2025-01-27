@@ -29,24 +29,22 @@ body {
 
 ## Problemática
 
-xxxxxx
+El país está atravesando por un periodo favorable para el crecimiento y desarrollo económico debido a la existencia de una parte importante de su población en edad de trabajar. Los beneficios de este periodo no son automáticos, requieren inversiones en educación y en empleo, especialmente en los jóvenes. Dado que estos constituyen una fuente importante para capitalizar esta ventana de oportunidades, resulta crucial estudiar a aquellos que están excluidos del ámbito educativo y laboral, es decir, los que conforman la población que ni estudia ni trabaja (NINI). En este sentido, el objetivo de este trabajo es caracterizar a esta población, así como identificar los determinantes sociales que influyen en la probabilidad de pertenecer a esta población.
 
 ## Planteamiento de problema
 
-xxxx
+¿Cuáles son las características de la población NINI? ¿Cuáles son los determinantes de la población NINI?
 
 # 1. Base de datos
 
 ## 1.1. Cargar bases de datos
 
-Limpiar la consola de trabajo
-
+Se limpia la consola de trabajo
 ```{r}
 rm(list=ls())
 ```
 
-Instalar librerias
-
+Se instala librerias
 ```{r message=FALSE, warning=FALSE}
 if (!require("haven")) install.packages("haven")
 if (!require("tidyverse")) install.packages("tidyverse")
@@ -54,10 +52,11 @@ if (!require("foreign")) install.packages("foreign")
 if (!require("survey")) install.packages("survey")
 if (!require("ggplot2")) install.packages("ggplot2")
 if (!requireNamespace("kableExtra", quietly = TRUE)) install.packages("kableExtra")
+if (!require("MASS")) install.packages("MASS")
+if (!require("pROC")) install.packages("pROC")
 ```
 
-Activar las librerias
-
+Se activa las librerias
 ```{r message=FALSE, warning=FALSE}
 library(dplyr)
 library(stringr)
@@ -66,20 +65,18 @@ library(haven)
 library(survey)
 library(ggplot2)
 library(kableExtra)
+library(MASS)
+library(pROC)
 ```
 
-Configurar la carpeta directorio
-
+Se configura la carpeta directorio
 ```{r message=FALSE, warning=FALSE}
-ruta <- "D:/Estudios/Continental/Estadistica/pa_grupo3"
+ruta <- "C:/Users/M S I/OneDrive/ymgc/notebook/r/pa_grupo3/"
 setwd(ruta)
 getwd()
 ```
 
-Importar módulos
-
-Se importó 3 módulos de las ENAHO: Empleo, Educación y Miembros de hogar
-
+Se importa 3 módulos de las ENAHO: Empleo, Educación y Miembros de hogar
 ```{r}
 m_empleo <- read_dta(paste("./enaho01a-2023-500.dta",sep="/"))
 m_educacion <- read_dta(paste("./enaho01a-2023-300.dta",sep="/"))
@@ -88,7 +85,7 @@ m_miembros <- read_dta(paste("./enaho01-2023-200.dta",sep="/"))
 
 ## 1.2. Unir base de datos
 
-Se combinan los módulos por las variables llave (conglome, vivienda, hogar, codperso)
+Se combina los módulos por las variables llave (conglome, vivienda, hogar, codperso)
 
 ```{r}
 datos <- left_join(m_empleo, m_educacion, by = c("conglome", "vivienda", "hogar", "codperso"))
@@ -100,21 +97,18 @@ datos <- left_join(datos, m_miembros, by = c("conglome", "vivienda", "hogar", "c
 -   **Seleccionar las personas que tienen 15 a 29 años de edad**
 
 Se renombra la variable p208a a "edad"
-
 ```{r}
 datos <- datos %>% rename(edad =p208a)
 table(datos$edad, useNA = "alw")
 ```
 
 Se filtra para jóvenes entre 15-29 años
-
 ```{r}
 jovenes <- datos %>% filter(edad >= 15 & edad <= 29)
 table(jovenes$edad, useNA = "alw")
 ```
 
 Se libera la memoria
-
 ```{r}
 rm(datos, m_educacion, m_empleo, m_miembros)
 ```
@@ -122,31 +116,27 @@ rm(datos, m_educacion, m_empleo, m_miembros)
 ### Variable residencia
 
 Se genera la tabla de frecuencia en función a la variable p204 - ¿Es miembro del hogar?
-
 ```{r}
 table(jovenes$p204, useNA = "alw")
 ```
 
 Se genera la tabla de frecuencia en función a la variable p205 - ¿Se encuentra ausente del hogar 30 dias a mas?
-
 ```{r}
 table(jovenes$p205, useNA = "alw")
 ```
 Se genera la tabla de frecuencia en función a la variable p206 - ¿Esta presente en el hogar 30 dias a mas?
-
 ```{r}
 table(jovenes$p206, useNA = "alw")
 ```
 
 Se crea la variable "residencia" usando una condición logica y se muestra la tabla de frecuencia
-
 ```{r}
 jovenes <- jovenes %>% mutate(residencia = ifelse((p204 == 1 & p205 == 2) | (p204 == 2 & p206 == 1), 1, 0))
 table(jovenes$residencia, useNA = "alw")
 ```
 
-Se filtra el dataframe donde residencia = 1 y se muestra la tabla de frecuencia
 
+Se filtra el dataframe donde residencia = 1 y se muestra la tabla de frecuencia
 ```{r}
 jovenes <- jovenes %>% filter(residencia == 1)
 table(jovenes$residencia, useNA = "alw")
@@ -157,7 +147,6 @@ table(jovenes$residencia, useNA = "alw")
 Se crea una nueva columna llamada departamento con los dos primeros caracteres del ubigeo.
 Se emplea mutate() para recodificar los numeros en nombres de departamentos.
 Se muestra la tabla de frecuencia de la variable departamento.
-
 ```{r}
 jovenes$departamento <- as.numeric(substr(jovenes$ubigeo, 1, 2))
 jovenes <- jovenes %>% mutate(departamento = recode(departamento, '1' = "Amazonas", '2' = "Ancash", '3' = "Apurímac",
@@ -173,13 +162,11 @@ table(jovenes$departamento, useNA = "alw")
 ### Variable área de residencia
 
 Se verifica la distribución de la variable "estrato" incluyendo los valores perdidos (NA).
-
 ```{r}
 table(jovenes$estrato, useNA = "alw")
 ```
 
 Se procedio a recodificar la variable "area" con los valores (Urbano, Rural, NA) y verificamos la distribución de la variable.
-
 ```{r}
 jovenes <- jovenes %>% mutate( area = ifelse(estrato>=1 & estrato<=5, "Urbano", ifelse(estrato>=6 & estrato<=8, "Rural", NA )))
 table(jovenes$area, useNA = "alw")
@@ -188,13 +175,12 @@ table(jovenes$area, useNA = "alw")
 ### Variable sexo
 
 Se verifica la distribución de la variable "p207" incluyendo los valores perdidos (NA).
-
 ```{r}
 table(jovenes$p207, useNA = "alw")
 ```
 
-Se procedio a recodificar la variable "sexo" con los valores (Hombre, Mujer, NA) y verificamos la distribución de la variable.
 
+Se procedio a recodificar la variable "sexo" con los valores (Hombre, Mujer, NA) y verificamos la distribución de la variable.
 ```{r}
 jovenes <- jovenes %>% mutate(sexo = ifelse(p207==1, "Hombre", ifelse(p207==2, "Mujer", NA)))
 table(jovenes$sexo, useNA = "alw")
@@ -203,13 +189,11 @@ table(jovenes$sexo, useNA = "alw")
 ### Variable region natural
 
 Se verifica la distribución de la variable "dominio" incluyendo los valores perdidos (NA).
-
 ```{r}
 table(jovenes$dominio, useNA = "alw")
 ```
 
-Se procedio a recodificar la variable "region" con los valores (Costa, Sierra, Selva, NA) y verificamos la distribución de la variable.
-
+Se recodifica la variable "region" con los valores (Costa, Sierra, Selva, NA) y verificamos la distribución de la variable.
 ```{r}
 jovenes <- jovenes %>% mutate(region = ifelse( (dominio>=1 & dominio<=3) | dominio==8, "Costa", 
                                                ifelse(dominio>=4 & dominio<=6, "Sierra",
@@ -220,13 +204,11 @@ table(jovenes$region, useNA = "alw")
 ### Variable grupo de edad
 
 Se verifica la distribución de la variable "edad" incluyendo los valores perdidos (NA).
-
 ```{r}
 table(jovenes$edad, useNA = "alw")
 ```
 
-Se procedio a recodificar la variable "edad" con los valores (De 15 a 17 años, De 18 a 24 años, De 25 a 29 años, NA) y verificamos la distribución de la variable.
-
+Se recodifica la variable "edad" con los valores (De 15 a 17 años, De 18 a 24 años, De 25 a 29 años, NA) y verificamos la distribución de la variable.
 ```{r}
 jovenes <- jovenes %>% mutate(gedad = case_when( edad %in% c(15:17) ~ "De 15 a 17 años", 
                                                  edad %in% c(18:24) ~ "De 18 a 24 años",
@@ -237,13 +219,11 @@ table(jovenes$gedad, useNA = "alw")
 ### Variable nivel educativo
 
 Se verifica la distribución de la variable "p301a.x" incluyendo los valores perdidos (NA).
-
 ```{r}
 table(jovenes$p301a.x, useNA = "alw")
 ```
 
-Se procedio a recodificar la variable "p301a.x" con los valores (Primaria, Secundaria, SNU, SU, NA) y verificamos la distribución de la variable.
-
+Se recodifica la variable "p301a.x" con los valores (Primaria, Secundaria, SNU, SU, NA) y verificamos la distribución de la variable.
 ```{r}
 jovenes <- jovenes %>% mutate(nivel_educ = ifelse( (p301a.x>=1 & p301a.x<=4) | p301a.x==12, "Primaria",
                                            ifelse( (p301a.x>=5 & p301a.x<=6), "Secundaria",
@@ -255,13 +235,11 @@ table(jovenes$nivel_educ, useNA = "alw")
 ### Variable lengua materna
 
 Se verifica la distribución de la variable "p300a" incluyendo los valores perdidos (NA).
-
 ```{r}
 table(jovenes$p300a, useNA = "alw")
 ```
 
-Se procedio a recodificar la variable "lengua" con los valores (Castellano, Lengua Nativa, NA) y verificamos la distribución de la variable.
-
+Se recodifica la variable "lengua" con los valores (Castellano, Lengua Nativa, NA) y verificamos la distribución de la variable.
 ```{r}
 jovenes <- jovenes %>% mutate(lengua = ifelse(p300a==4, "Castellano", "Lengua nativa"))
 table(jovenes$lengua, useNA = "alw")
@@ -281,14 +259,14 @@ Se verifica la distribución de la variable "p307" incluyendo los valores perdid
 table(jovenes$p307, useNA = "alw")
 ```
 
-Se procedio a recodificar la variable "p307", aplicando la condicional, si tiene un valor NA reemplazalo con 2 y verificamos la distribución de la variable.
+Se recodifica la variable "p307", aplicando la condicional, si tiene un valor NA reemplazalo con 2 y verificamos la distribución de la variable.
 
 ```{r}
 jovenes <- jovenes %>% mutate(p307 = ifelse(is.na(p307), 2, p307))
 table(jovenes$p307, useNA = "alw")
 ```
 
-Se procedio a recodificar la variable "nini", que identifica jóvenes que no estudian ni trabajan y verificamos la distribución de la variable.
+Se recodifica la variable "nini", que identifica jóvenes que no estudian ni trabajan y verificamos la distribución de la variable.
 
 ```{r}
 jovenes <- jovenes %>% mutate(nini = ifelse( (ocu500==3 | ocu500==4) & (p307==2), 1, 0))
@@ -300,13 +278,12 @@ table(jovenes$nini, useNA = "alw")
 Seleccionamos especificamente las columnas trabajadas del dataframe "jovenes".
 
 ```{r}
-jovenes <- jovenes %>% select(departamento, area, sexo, region, gedad, nivel_educ, lengua, nini, conglome, estrato, fac500a)
+jovenes <- jovenes %>% dplyr::select(departamento, area, sexo, region, gedad, nivel_educ, lengua, nini, conglome, estrato, fac500a)
 ```
 
 ## 1.5. Guardar base de datos limpia
 
 Se guarda el dataframe "jovenes" filtrado.
-
 ```{r}
 save(jovenes, file=paste("./joevenes15a29.RData",sep="/"))
 ```
@@ -315,13 +292,12 @@ save(jovenes, file=paste("./joevenes15a29.RData",sep="/"))
 
 ## 2.1. Especificar el tipo de muestreo
 
-Cargar base de datos limpia
-
+Se carga la base de datos limpia
 ```{r}
 load(paste("./joevenes15a29.RData",sep="/"))
 ```
 
-Especificar el tipo de muestreo
+Se especifica el tipo de muestreo
 
 ```{r}
 encuesta = svydesign(data=jovenes, id=~conglome, strata=~estrato, weights=~fac500a)
@@ -329,8 +305,7 @@ encuesta = svydesign(data=jovenes, id=~conglome, strata=~estrato, weights=~fac50
 
 ## 2.2. Población NINI
 
-En el año 2023, se estima que el x% de la población de 15 a 29 años de edad, ni estudia ni trabaja (NINI).
-
+En el año 2023, se estima que el 19.02% de la población de 15 a 29 años de edad, ni estudia ni trabaja (NINI).
 ```{r}
 nini <- svymean(~nini, encuesta, deff=F, na.rm=T)
 nini
@@ -343,7 +318,6 @@ La población conformada por adolescentes y jóvenes entre 15 y 29 años de edad
 ## 3.1. NINI según departamento
 
 Según los datos por departamento, en el año 2023, en Loreto (25.19%) se presentó el mayor porcentaje de población que ni estudia ni trabaja (nini), le sigue Tumbes con el 24.99% y Madre de Dios con 22.33%.
-
 ```{r}
 nini_dpto <- svyby(~nini, ~departamento, encuesta, svymean, deff=F, na.rm=T)
 nini_dpto <- nini_dpto %>% mutate(across(where(is.numeric), ~ round(. * 100, 2)),
@@ -375,7 +349,6 @@ ggplot(nini_dpto, aes(x = reorder(departamento, nini), y = nini)) +
 ## 3.2. NINI según área de residencia
 
 Se estimó que el 19.02% de la población es nini. Este problema afectó en mayor proporción a los jóvenes del área urbana (19.56%) que del área rural (16.63%).
-
 ```{r}
 nini_area <- svyby(~nini, ~area, encuesta, svymean, deff=F, na.rm=T)
 nini_area <- nini_area %>% mutate(across(where(is.numeric), ~ round(. * 100, 2)),
@@ -411,7 +384,6 @@ ggplot(nini_area, aes(x = area, y = nini, fill = area)) +
 En la encuesta, se observa que existe una marcada diferencia por sexo, el 24.23% de las mujeres, en comparación del 13.98% de los hombres, es considerada nini.
 
 Esta diferencia se podría justificar por eventos de la vida personal, como embarazo precoz, que suele truncar la actividad educativa y económica de las mujeres.
-
 ```{r}
 nini_sexo <- svyby(~nini, ~sexo, encuesta, svymean, deff=F, na.rm=T)
 nini_sexo <- nini_sexo %>%
@@ -421,21 +393,30 @@ kable(nini_sexo, digits = 2, row.names = FALSE, col.names = c("Sexo", "Proporci�
 ```
 
 ```{r fig.align='center'}
-# Crear el gráfico de pie
-ggplot(nini_sexo, aes(x = "", y = nini, fill = sexo)) +
-  geom_bar(stat = "identity", width = 1, color = "white", size=2) +
-  coord_polar("y", start = 0) +
-  geom_text(aes(label = paste0(round(nini, 2), "%")), position = position_stack(vjust = 0.5)) +
-  labs(title = "Proporción de Nini por Sexo", x = "", y = "") +
-  scale_fill_manual(values = c("Hombre" = "cornflowerblue", "Mujer" = "lightpink")) +
-  theme_void()+
-  theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank(), panel.grid = element_blank())
+ggplot(nini_sexo, aes(x = sexo, y = nini, fill = sexo)) +
+  geom_bar(stat = "identity", width = 0.6, alpha = 0.8) +
+  geom_text(aes(label = paste0(round(nini, 2), "%")), 
+            vjust = -0.8, size = 5, color = "black") +
+  scale_fill_manual(values = c("steelblue", "tomato")) +
+  labs(
+    title = "Proporción de Ninis por sexo",
+    x = "Sexo",
+    y = "Proporción (%)",
+    fill = "Sexo"
+  ) +
+  ylim(0, 30) + # Amplía el rango del eje Y
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5, size = 14),
+    legend.position = "none"
+  )
 ```
 
 ## 3.4. NINI según región natural
 
 Según región natural, en el año 2023, en la Costa (19.89%) se presentó el mayor porcentaje de población que ni estudia ni trabaja, le sigue muy cerca la Selva con 19.77% y la Sierra tiene el menor porcentaje con 17.06%.
-
 ```{r}
 nini_region <- svyby(~nini, ~region, encuesta, svymean, deff=F, na.rm=T)
 nini_region <- nini_region %>% mutate(across(where(is.numeric), ~ round(. * 100, 2)),
@@ -468,9 +449,7 @@ ggplot(nini_region, aes(x = region, y = nini, fill = region)) +
 
 ## 3.5. NINI según grupo de edad
 
-Según grupos de edad, el grupo de menor edad (De 15 a 17 años) concentró la mayor proporción de mujeres (25.18%), que ni estudia ni trabaja, en comparaci{on con los hombres (18.81%); lo sigue el grupo de 18 a 24 años, donde las mujeres representaron el 24.28% y los hombres el 16.52, y el grupo de 25 a 29 años, las mujeres constituyeron el 23.60& y los hombres el 7.43&.
-
-
+Según grupos de edad, el grupo de menor edad (De 15 a 17 años) concentró la mayor proporción de mujeres (25.18%), que ni estudia ni trabaja, en comparación con los hombres (18.81%); lo sigue el grupo de 18 a 24 años, donde las mujeres representaron el 24.28% y los hombres el 16.52, y el grupo de 25 a 29 años, las mujeres constituyeron el 23.60% y los hombres el 7.43%.
 ```{r}
 nini_edad_sexo <- svyby(~nini, ~interaction(gedad, sexo, drop = TRUE), encuesta, svymean, deff=F, na.rm=T)
 colnames(nini_edad_sexo)[1] <- "GrupoEdadSexo"
@@ -488,7 +467,7 @@ nini_edad_sexo <- nini_edad_sexo %>%
   ungroup()
 # Crear la tabla y agrupar celdas en la columna "Grupo de edad"
 tabla_nini_edad_sexo <- kable(nini_edad_sexo %>%
-  select(`Grupo de edad`, Sexo, nini, se, cv), 
+  dplyr::select(`Grupo de edad`, Sexo, nini, se, cv), 
   digits = 2, col.names = c("Grupo de edad", "Sexo", "Proporción Nini (%)", "Error estándar (%)", "Coeficiente de variación (%)")) %>%
   kable_styling(position = "center", full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed")) %>%
   collapse_rows(columns = 1, valign = "top")
@@ -545,7 +524,6 @@ ggplot(nini_nivel_educ, aes(x = nivel_educ, y = nini, fill = nivel_educ)) +
 ## 3.7. NINI según lengua materna
 
 Se observa que los nini con lengua Castellano (19.43%) fue mayor que la población de nini con lengua nativa (15.75%), esta situación se hace más notoria si se disgrega por sexo. El 24.62% de las mujeres y el 14.47% de los hombres con lengua castellano, integraban los nini, existiendo una brecha del 10.15%; mientras que, en la población con lengua nativa, el 21.51% eran mujeres y el 9.72% hombres, mostrando una mayor brecha de 11.79 puntos porcentuales.
-
 ```{r}
 # Calcular la proporción de nini por sexo y lengua materna
 nini_sexo_lengua <- svyby(~nini, ~interaction(sexo, lengua, drop = TRUE), encuesta, svymean, deff=F, na.rm=T)
@@ -578,7 +556,7 @@ colnames(nini_lengua)[1] <- "Lengua materna"
 
 # Seleccionar y ordenar las columnas en total_lengua
 nini_lengua <- nini_lengua %>%
-  select(sexo, `Lengua materna`, Proporción_Nini, Error_estándar, Coeficiente_variación)
+  dplyr::select(sexo, `Lengua materna`, Proporción_Nini, Error_estándar, Coeficiente_variación)
 
 # Combinar los datos originales con los totales
 nini_sexo_lengua_total <- bind_rows(nini_sexo_lengua, nini_lengua)
@@ -594,7 +572,7 @@ nini_sexo_lengua_total <- nini_sexo_lengua_total %>%
     
 # Presentar la tabla con kable
 tabla_nini_sexo_lengua <- kable(nini_sexo_lengua_total %>%
-  select(Sexo, `Lengua materna`, Proporción_Nini, Error_estándar, Coeficiente_variación), 
+  dplyr::select(Sexo, `Lengua materna`, Proporción_Nini, Error_estándar, Coeficiente_variación), 
   digits = 2, col.names = c("Sexo", "Lengua materna", "Proporción Nini (%)", "Error estándar (%)", "Coeficiente de variación (%)")) %>%
   kable_styling(position = "center", full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed")) %>%
   collapse_rows(columns = 1, valign = "top")
@@ -621,4 +599,25 @@ ggplot(nini_sexo_lengua_total, aes(x = `Lengua materna`, y = Proporción_Nini, f
 
 # 4. Determinantes NINI
 
-XXXXXXXXXXXXXX
+Se convierte las variables a factores
+```{r}
+jovenes$nini <- as.numeric(jovenes$nini)
+jovenes$area <- as.factor(jovenes$area)
+jovenes$sexo <- as.factor(jovenes$sexo)
+jovenes$region <- as.factor(jovenes$region)
+jovenes$gedad <- as.factor(jovenes$gedad)
+jovenes$nivel_educ <- as.factor(jovenes$nivel_educ)
+jovenes$lengua <- as.factor(jovenes$lengua)
+```
+
+Se estima el modelo probit
+
+Como se observa en la siguiente tabla, los resultados del primer modelo que estimamos, indican que los jovenes que residen en zonas urbanas, que son mujeres y que tienen entre 18 a 24 años tienen mayor probabilidad de pertenecer a la población NINI. En cambio, los jovenes que viven en la sierra, que continuan sus estudios y su lengua materna es nativa tienen menor probabilidad de pertenecer a la población NINI.
+
+```{r}
+modelo_probit <- glm(nini ~ area + sexo + region + gedad + nivel_educ + lengua, 
+                     data = jovenes, 
+                     family = binomial(link = "probit"))
+summary(modelo_probit)
+```
+
